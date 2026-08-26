@@ -97,6 +97,8 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
     val showAttachmentOptions by remember { viewModel.showAttachmentOptions }
     val showAttachmentDialog by remember { viewModel.showAttachmentDialog }
     val selectedAttachment by remember { viewModel.selectedAttachment }
+    val showMetadataPrompt by remember { viewModel.showMetadataPrompt }
+    val isProcessingAttachment by remember { viewModel.isProcessingAttachment }
     var showConversationSearch by remember { mutableStateOf(false) }
     var selectedMessageForMenu by remember { mutableStateOf<SmsMessage?>(null) }
     var showScheduleDialog by remember { mutableStateOf(false) }
@@ -158,6 +160,31 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
         )
     }
     
+    if (showMetadataPrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.keepAttachmentMetadata() },
+            title = { Text("Remove media metadata?") },
+            text = {
+                Text("Pictures and videos can contain location, device, and timestamp metadata. Strip it before sending for greater privacy?")
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.keepAttachmentMetadata() }) { Text("Keep metadata") }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.stripAttachmentMetadata() }) { Text("Strip metadata") }
+            }
+        )
+    }
+
+    if (isProcessingAttachment) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Preparing attachment") },
+            text = { Text("Removing metadata before sending…") },
+            confirmButton = {}
+        )
+    }
+
     // Attachment viewing dialog
     if (showAttachmentDialog && selectedAttachment != null) {
         AttachmentViewDialog(

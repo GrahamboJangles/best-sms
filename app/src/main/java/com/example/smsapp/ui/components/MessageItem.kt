@@ -147,6 +147,28 @@ fun MessageItem(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (!isIncoming) {
+                    val statusText = when (message.sendStatus) {
+                        SendStatus.SENDING -> "Sending"
+                        SendStatus.SENT -> "Sent"
+                        SendStatus.FAILED -> "Failed"
+                        SendStatus.NONE -> "Status unavailable"
+                    }
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (message.sendStatus == SendStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                } else if (message.read == 0) {
+                    Text(
+                        text = "Unread",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
                 if (message.hasAttachment) {
                     val attachmentInfo = when (message.attachmentType) {
                         AttachmentType.IMAGE -> "Image"

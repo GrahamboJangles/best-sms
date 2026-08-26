@@ -302,6 +302,18 @@ object SmsUtils {
         }
     }
     
+    fun markConversationRead(context: Context, address: String) {
+        if (address.isBlank()) return
+        runCatching {
+            context.contentResolver.update(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                android.content.ContentValues().apply { put(Telephony.Sms.READ, 1) },
+                "address = ? AND read = 0",
+                arrayOf(address)
+            )
+        }.onFailure { Log.e(TAG, "Unable to mark conversation read", it) }
+    }
+
     fun getInboxMessages(context: Context): List<SmsMessage> {
         return retrieveAllMessages(context)
     }

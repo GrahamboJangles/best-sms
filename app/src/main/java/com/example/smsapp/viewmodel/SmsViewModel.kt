@@ -16,6 +16,7 @@ import com.example.smsapp.model.Conversation
 import com.example.smsapp.model.SmsMessage
 import com.example.smsapp.model.SendStatus
 import com.example.smsapp.receiver.ScheduledSmsReceiver
+import com.example.smsapp.util.MediaSanitizer
 import com.example.smsapp.util.SmsUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -92,6 +93,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     val currentAttachmentType = mutableStateOf(AttachmentType.NONE)
     val currentAttachmentContentType = mutableStateOf("")
     val isProcessingAttachment = mutableStateOf(false)
+    val showMetadataPrompt = mutableStateOf(false)
     
     // Dialog for viewing attachments
     val showAttachmentDialog = mutableStateOf(false)
@@ -359,6 +361,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun selectConversation(contactAddress: String) {
+        SmsUtils.markConversationRead(getApplication(), contactAddress)
         currentContact.value = contactAddress
         conversationSearchQuery.value = ""
         isInConversationList.value = false
@@ -367,7 +370,8 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         _messages.clear()
         // Sort messages by date (oldest first) so newest messages appear at the bottom
         val filteredMessages = _allMessages.filter { it.address == contactAddress }
-                                         .sortedBy { it.date }
+            .map { if (it.type == android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX) it.copy(read = 1) else it }
+            .sortedBy { it.date }
         _messages.addAll(filteredMessages)
         
         // Set contact name (use saved contact name or look it up)
@@ -525,6 +529,26 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         currentAttachmentType.value = type
         currentAttachmentContentType.value = contentType
         showAttachmentOptions.value = false
+        showMetadataPrompt.value = type == AttachmentType.IMAGE || type == AttachmentType.VIDEO
+    }
+
+    fun keepAttachmentMetadata() {
+        showMetadataPrompt.value = false
+    }
+
+    fun stripAttachmentMetadata() {
+        val source = currentAttachmentUri.value ?: return
+        val type = currentAttachmentType.value
+        val mimeType = currentAttachmentContentType.value
+        viewModelScope.launch {
+            isProcessingAttachment.value = true
+            val sanitized = withContext(Dispatchers.IO) {
+                MediaSanitizer.stripMetadata(getApplication(), source, type, mimeType)
+            }
+            if (sanitized != null) currentAttachmentUri.value = sanitized
+            isProcessingAttachment.value = false
+            showMetadataPrompt.value = false
+        }
     }
     
     fun clearAttachment() {
