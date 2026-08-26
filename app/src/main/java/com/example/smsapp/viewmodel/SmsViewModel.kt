@@ -376,6 +376,17 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         _messages.clear()
     }
     
+    fun retryMessage(message: SmsMessage) {
+        currentRecipient.value = message.address
+        currentMessage.value = message.body
+        if (message.hasAttachment && message.attachmentUri.isNotBlank()) {
+            currentAttachmentUri.value = Uri.parse(message.attachmentUri)
+            currentAttachmentType.value = message.attachmentType
+            currentAttachmentContentType.value = message.attachmentContentType
+        }
+        sendMessage()
+    }
+
     fun sendMessage() {
         if (currentRecipient.value.isNotEmpty() && (currentMessage.value.isNotEmpty() || currentAttachmentUri.value != null)) {
             val recipient = currentRecipient.value

@@ -363,7 +363,8 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                     items(messages) { message ->
                         MessageItem(
                             message = message,
-                            onAttachmentClick = { viewModel.viewAttachment(message) }
+                            onAttachmentClick = { viewModel.viewAttachment(message) },
+                            onRetryClick = { viewModel.retryMessage(it) }
                         )
                         }
                     }

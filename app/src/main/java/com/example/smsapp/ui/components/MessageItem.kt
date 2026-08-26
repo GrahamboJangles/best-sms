@@ -28,6 +28,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -55,7 +56,8 @@ import java.util.Locale
 @Composable
 fun MessageItem(
     message: SmsMessage,
-    onAttachmentClick: ((SmsMessage) -> Unit)? = null
+    onAttachmentClick: ((SmsMessage) -> Unit)? = null,
+    onRetryClick: ((SmsMessage) -> Unit)? = null
 ) {
     val isIncoming = message.type == android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX
     val alignment = if (isIncoming) Alignment.CenterStart else Alignment.CenterEnd
@@ -118,6 +120,12 @@ fun MessageItem(
                 )
             }
             
+            if (!isIncoming && message.sendStatus == SendStatus.FAILED && onRetryClick != null) {
+                TextButton(onClick = { onRetryClick(message) }) {
+                    Text("Retry")
+                }
+            }
+
             // Show message body if it's not empty
             if (message.body.isNotEmpty()) {
                 Text(
