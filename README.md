@@ -51,6 +51,19 @@ Compose screens and reusable components
 
 `SmsUtils` is the boundary for Android telephony and Contacts Provider access. `SmsViewModel` owns screen state and user actions. Compose screens should call ViewModel methods rather than querying providers directly. New provider integrations should be isolated in `util/` and mapped into the existing models.
 
+## Build the APK if you are a complete beginner
+
+The easiest Windows workflow is:
+
+1. Install [Android Studio](https://developer.android.com/studio) using the standard options.
+2. Open Android Studio once so it installs the Android SDK.
+3. Download this repository with **Code → Download ZIP** and extract it.
+4. Double-click **`build_debug.bat`** in the extracted project folder.
+5. Wait for the window to say **SUCCESS**. Your APK will be copied to **`BestSMS-debug.apk`** in the project folder.
+6. Copy that APK to your Android phone, open it, and approve installation.
+
+You do not need to install Gradle separately. The included Gradle wrapper downloads the correct Gradle version automatically. For screenshots, SDK setup details, installation steps, and troubleshooting, read [`BUILDING_WINDOWS.md`](BUILDING_WINDOWS.md).
+
 ## Build requirements
 
 Use Android Studio or a machine with Java 21, Android SDK Platform 35, and the Android Gradle Plugin version declared by the project. From the repository root:
