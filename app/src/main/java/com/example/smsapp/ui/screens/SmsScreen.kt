@@ -94,7 +94,8 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
     val showAttachmentDialog by remember { viewModel.showAttachmentDialog }
     val selectedAttachment by remember { viewModel.selectedAttachment }
     var showConversationSearch by remember { mutableStateOf(false) }
-    
+    var selectedMessageForMenu by remember { mutableStateOf<SmsMessage?>(null) }
+
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -364,13 +365,44 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                         MessageItem(
                             message = message,
                             onAttachmentClick = { viewModel.viewAttachment(message) },
-                            onRetryClick = { viewModel.retryMessage(it) }
+                            onRetryClick = { viewModel.retryMessage(it) },
+                            onLongClick = { selectedMessageForMenu = it }
                         )
                         }
                     }
                 }
             }
         }
+    }
+
+    selectedMessageForMenu?.let { message ->
+        AlertDialog(
+            onDismissRequest = { selectedMessageForMenu = null },
+            title = { Text("Message actions") },
+            text = {
+                Column {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Message", message.body))
+                        selectedMessageForMenu = null
+                    }) { Text("Copy text") }
+                    TextButton(onClick = {
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, message.body)
+                        }, "Share message"))
+                        selectedMessageForMenu = null
+                    }) { Text("Share") }
+                    TextButton(onClick = {
+                        viewModel.updateMessage(message.body)
+                        selectedMessageForMenu = null
+                    }) { Text("Forward") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedMessageForMenu = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 

@@ -4,7 +4,8 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,11 +54,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageItem(
     message: SmsMessage,
     onAttachmentClick: ((SmsMessage) -> Unit)? = null,
-    onRetryClick: ((SmsMessage) -> Unit)? = null
+    onRetryClick: ((SmsMessage) -> Unit)? = null,
+    onLongClick: ((SmsMessage) -> Unit)? = null
 ) {
     val isIncoming = message.type == android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX
     val alignment = if (isIncoming) Alignment.CenterStart else Alignment.CenterEnd
@@ -74,7 +77,11 @@ fun MessageItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(8.dp)
+            .combinedClickable(
+                onClick = { },
+                onLongClick = { onLongClick?.invoke(message) }
+            ),
         contentAlignment = alignment
     ) {
         Column(
@@ -172,6 +179,7 @@ fun MessageItem(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AttachmentContent(
     message: SmsMessage,
@@ -180,7 +188,10 @@ fun AttachmentContent(
 ) {
     Card(
         modifier = modifier
-            .clickable { onAttachmentClick() }
+            .combinedClickable(
+                onClick = { onAttachmentClick() },
+                onLongClick = { }
+            )
     ) {
         when (message.attachmentType) {
             AttachmentType.IMAGE -> {
