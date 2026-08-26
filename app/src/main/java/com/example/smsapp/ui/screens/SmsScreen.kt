@@ -1,5 +1,7 @@
 package com.example.smsapp.ui.screens
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -78,6 +80,7 @@ import com.example.smsapp.model.SmsMessage
 import com.example.smsapp.ui.components.MessageItem
 import com.example.smsapp.viewmodel.SmsViewModel
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.imePadding
 
@@ -391,6 +394,38 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
             text = {
                 Column {
                     Text("Choose when to send this message.")
+                    TextButton(onClick = {
+                        val calendar = Calendar.getInstance().apply { add(Calendar.MINUTE, 5) }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                calendar.set(Calendar.YEAR, year)
+                                calendar.set(Calendar.MONTH, month)
+                                calendar.set(Calendar.DAY_OF_MONTH, day)
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        calendar.set(Calendar.HOUR_OF_DAY, hour)
+                                        calendar.set(Calendar.MINUTE, minute)
+                                        calendar.set(Calendar.SECOND, 0)
+                                        calendar.set(Calendar.MILLISECOND, 0)
+                                        if (!viewModel.scheduleMessageAt(calendar.timeInMillis)) {
+                                            android.widget.Toast.makeText(context, "Choose a future time", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                        showScheduleDialog = false
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    false
+                                ).show()
+                            },
+                            calendar.get(Calendar.YEAR),
+                            calendar.get(Calendar.MONTH),
+                            calendar.get(Calendar.DAY_OF_MONTH)
+                        ).apply {
+                            datePicker.minDate = System.currentTimeMillis()
+                        }.show()
+                    }) { Text("Choose date and time…") }
                     TextButton(onClick = {
                         viewModel.scheduleMessageAfterMinutes(15)
                         showScheduleDialog = false

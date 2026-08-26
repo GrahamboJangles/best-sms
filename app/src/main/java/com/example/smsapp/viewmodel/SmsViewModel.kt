@@ -427,10 +427,10 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         sendMessage()
     }
 
-    fun scheduleMessageAfterMinutes(minutes: Int): Boolean {
+    fun scheduleMessageAt(triggerAtMillis: Long): Boolean {
         val recipient = currentRecipient.value.ifBlank { currentContact.value }
         val body = currentMessage.value
-        if (recipient.isBlank() || body.isBlank() || minutes <= 0) return false
+        if (recipient.isBlank() || body.isBlank() || triggerAtMillis <= System.currentTimeMillis()) return false
         val requestCode = (System.currentTimeMillis() and 0x7fffffff).toInt()
         val intent = Intent(getApplication(), ScheduledSmsReceiver::class.java).apply {
             putExtra(ScheduledSmsReceiver.EXTRA_RECIPIENT, recipient)
@@ -441,14 +441,14 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val alarm = getApplication<Application>().getSystemService(AlarmManager::class.java)
-        alarm.setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + minutes * 60_000L,
-            pendingIntent
-        )
+        alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         currentMessage.value = ""
         clearDraft()
         return true
+    }
+
+    fun scheduleMessageAfterMinutes(minutes: Int): Boolean {
+        return scheduleMessageAt(System.currentTimeMillis() + minutes * 60_000L)
     }
 
     fun sendMessage() {
