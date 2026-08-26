@@ -1,5 +1,8 @@
 package com.example.smsapp.ui.components
 
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -7,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,10 +29,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -39,6 +46,8 @@ import coil.request.ImageRequest
 import com.example.smsapp.model.AttachmentType
 import com.example.smsapp.model.SmsMessage
 import com.example.smsapp.model.SendStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -180,6 +189,17 @@ fun AttachmentContent(
                 )
             }
             AttachmentType.VIDEO -> {
+                val context = LocalContext.current
+                val thumbnail by produceState<Bitmap?>(initialValue = null, message.attachmentUri) {
+                    value = withContext(Dispatchers.IO) {
+                        runCatching {
+                            MediaMetadataRetriever().use { retriever ->
+                                retriever.setDataSource(context, android.net.Uri.parse(message.attachmentUri))
+                                retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            }
+                        }.getOrNull()
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -187,7 +207,14 @@ fun AttachmentContent(
                         .background(Color.Black.copy(alpha = 0.7f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Video thumbnail could be loaded here with Coil
+                    if (thumbnail != null) {
+                        Image(
+                            bitmap = thumbnail!!.asImageBitmap(),
+                            contentDescription = "Video attachment preview",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play video",

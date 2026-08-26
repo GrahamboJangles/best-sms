@@ -194,9 +194,14 @@ object SmsUtils {
         "body", "date", "address"
     )
 
+    const val ACTION_MESSAGES_UPDATED = "com.example.smsapp.ACTION_MESSAGES_UPDATED"
+
     fun refreshMessages(context: Context) {
         try {
             appContextRef = WeakReference(context.applicationContext)
+            context.sendBroadcast(
+                Intent(ACTION_MESSAGES_UPDATED).setPackage(context.packageName)
+            )
         } catch (_: Exception) {
             // Best effort; the ViewModel will reload when it can.
         }
@@ -1487,11 +1492,154 @@ object SmsUtils {
                if (isSamsungMessagesDefault) " - Samsung Messages detected as default" else ""
     }
 
+    /**
+     * Read MMS rows and their parts from the platform MMS provider. The
+     * conversation provider often exposes the text but omits media parts.
+     * Keeping the part URI allows Coil and external viewers to stream the
+     * attachment directly from the provider.
+     */
+    private fun retrieveMmsMessages(context: Context): List<SmsMessage> {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return emptyList()
+        }
+
+        val messages = mutableListOf<SmsMessage>()
+        val resolver = context.contentResolver
+        try {
+            resolver.query(
+                Telephony.Mms.CONTENT_URI,
+                arrayOf(
+                    Telephony.Mms._ID,
+                    Telephony.Mms.THREAD_ID,
+                    Telephony.Mms.DATE,
+                    Telephony.Mms.MESSAGE_BOX,
+                    Telephony.Mms.SUBJECT
+                ),
+                null,
+                null,
+                "${Telephony.Mms.DATE} DESC"
+            )?.use { cursor ->
+                val idIndex = cursor.getColumnIndex(Telephony.Mms._ID)
+                val threadIndex = cursor.getColumnIndex(Telephony.Mms.THREAD_ID)
+                val dateIndex = cursor.getColumnIndex(Telephony.Mms.DATE)
+                val boxIndex = cursor.getColumnIndex(Telephony.Mms.MESSAGE_BOX)
+                val subjectIndex = cursor.getColumnIndex(Telephony.Mms.SUBJECT)
+                while (cursor.moveToNext()) {
+                    val mmsId = cursor.getLong(idIndex)
+                    val threadId = if (threadIndex >= 0) cursor.getLong(threadIndex) else 0L
+                    val rawDate = if (dateIndex >= 0) cursor.getLong(dateIndex) else 0L
+                    val date = if (rawDate > 100_000_000_000L) rawDate else rawDate * 1000L
+                    val box = if (boxIndex >= 0) cursor.getInt(boxIndex) else Telephony.Mms.MESSAGE_BOX_INBOX
+                    val isSent = box == Telephony.Mms.MESSAGE_BOX_SENT || box == Telephony.Mms.MESSAGE_BOX_OUTBOX
+                    val address = retrieveMmsAddress(context, mmsId, isSent)
+                    if (address.isBlank()) continue
+
+                    var body = if (subjectIndex >= 0) cursor.getString(subjectIndex).orEmpty() else ""
+                    var attachmentUri = ""
+                    var attachmentType = AttachmentType.NONE
+                    var attachmentContentType = ""
+                    var attachmentSize = 0L
+
+                    resolver.query(
+                        Uri.withAppendedPath(Telephony.Mms.CONTENT_URI, "$mmsId/part"),
+                        arrayOf("_id", "ct", "text", "_data", "name", "filename", "_size"),
+                        null,
+                        null,
+                        null
+                    )?.use { parts ->
+                        val partIdIndex = parts.getColumnIndex("_id")
+                        val contentTypeIndex = parts.getColumnIndex("ct")
+                        val textIndex = parts.getColumnIndex("text")
+                        val sizeIndex = parts.getColumnIndex("_size")
+                        while (parts.moveToNext()) {
+                            val contentType = if (contentTypeIndex >= 0) parts.getString(contentTypeIndex).orEmpty() else ""
+                            val text = if (textIndex >= 0) parts.getString(textIndex).orEmpty() else ""
+                            if (contentType.startsWith("text/", ignoreCase = true) && text.isNotBlank()) {
+                                body = text
+                                continue
+                            }
+                            if (contentType.isBlank() || contentType.equals("application/smil", ignoreCase = true)) continue
+                            if (partIdIndex < 0) continue
+                            val partId = parts.getLong(partIdIndex)
+                            attachmentUri = Uri.withAppendedPath(Telephony.Mms.CONTENT_URI, "$mmsId/part/$partId").toString()
+                            attachmentContentType = contentType
+                            attachmentType = when {
+                                contentType.startsWith("image/", ignoreCase = true) -> AttachmentType.IMAGE
+                                contentType.startsWith("video/", ignoreCase = true) -> AttachmentType.VIDEO
+                                contentType.startsWith("audio/", ignoreCase = true) -> AttachmentType.AUDIO
+                                contentType.startsWith("text/", ignoreCase = true) || contentType.contains("pdf", ignoreCase = true) -> AttachmentType.DOCUMENT
+                                else -> AttachmentType.OTHER
+                            }
+                            attachmentSize = if (sizeIndex >= 0 && !parts.isNull(sizeIndex)) parts.getLong(sizeIndex) else 0L
+                            break
+                        }
+                    }
+
+                    if (body.isBlank() && attachmentUri.isBlank()) continue
+                    messages.add(
+                        SmsMessage(
+                            id = "mms_$mmsId",
+                            address = cleanPhoneNumber(address),
+                            body = body,
+                            date = date,
+                            type = if (isSent) Telephony.Sms.MESSAGE_TYPE_SENT else Telephony.Sms.MESSAGE_TYPE_INBOX,
+                            read = 1,
+                            threadId = threadId,
+                            contactName = getContactName(context, address),
+                            hasAttachment = attachmentUri.isNotBlank(),
+                            attachmentType = attachmentType,
+                            attachmentUri = attachmentUri,
+                            attachmentContentType = attachmentContentType,
+                            attachmentSize = attachmentSize
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error retrieving MMS parts", e)
+        }
+        return messages
+    }
+
+    private fun retrieveMmsAddress(context: Context, mmsId: Long, sent: Boolean): String {
+        return try {
+            context.contentResolver.query(
+                Uri.withAppendedPath(Telephony.Mms.CONTENT_URI, "$mmsId/addr"),
+                arrayOf(Telephony.Mms.Addr.ADDRESS, Telephony.Mms.Addr.TYPE),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val addressIndex = cursor.getColumnIndex(Telephony.Mms.Addr.ADDRESS)
+                val typeIndex = cursor.getColumnIndex(Telephony.Mms.Addr.TYPE)
+                while (cursor.moveToNext()) {
+                    val type = if (typeIndex >= 0) cursor.getInt(typeIndex) else 137
+                    val isFrom = type == 137
+                    if ((sent && !isFrom) || (!sent && isFrom)) {
+                        return@use cursor.getString(addressIndex).orEmpty()
+                    }
+                }
+                ""
+            }.orEmpty()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error retrieving MMS address", e)
+            ""
+        }
+    }
+
     // Main message retrieval function
     fun retrieveAllMessages(context: Context): List<SmsMessage> {
         val allMessages = mutableListOf<SmsMessage>()
         val seenMessages = mutableSetOf<String>()
         var logInfo = "Message retrieval started\n"
+
+        // Read MMS first so the richer media-bearing row wins deduplication.
+        val mmsMessages = retrieveMmsMessages(context)
+        logInfo += "Standard MMS messages found: ${mmsMessages.size}\n"
+        mmsMessages.forEach { message ->
+            seenMessages.add(createDeduplicationKey(message))
+            allMessages.add(message)
+        }
 
         // Try standard SMS/MMS providers
         for (uri in STANDARD_MESSAGE_URIS) {
@@ -1891,11 +2039,14 @@ object SmsUtils {
         attachmentType: AttachmentType,
         isRcs: Boolean,
         attachmentContentType: String
-    ) {
+    ): Boolean {
         try {
             val attachmentUriParsed = Uri.parse(attachmentUri)
             val contentType = attachmentContentType.ifEmpty {
-                context.contentResolver.getType(attachmentUriParsed) ?: "*/*"
+                context.contentResolver.getType(attachmentUriParsed).orEmpty()
+            }.substringBefore(';').trim()
+            if (contentType.isBlank() || contentType == "*/*") {
+                throw IllegalArgumentException("The attachment type could not be determined")
             }
 
             val pdu = PduUtils.buildPdu(
@@ -1920,9 +2071,12 @@ object SmsUtils {
             val smsManager = SmsManager.getDefault()
             smsManager.sendMultimediaMessage(context, pduUri, null, null, null)
 
-            Log.d(TAG, "Media message sent to $recipient")
+            Log.d(TAG, "Media message sent to $recipient as $contentType")
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "Error sending media message", e)
+            Toast.makeText(context, "Could not send media message: ${e.message ?: "MMS error"}", Toast.LENGTH_LONG).show()
+            return false
         }
     }
 } 

@@ -326,16 +326,18 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             val messageText = currentMessage.value
             val hasAttachment = currentAttachmentUri.value != null
             
-            // Use RCS if available and we have attachments
-            val isRcs = hasAttachment && SmsUtils.canUseRcs(getApplication())
-            
+            // Attachments currently use the platform MMS path. RCS detection is
+            // informational only; it does not change the transport yet.
+            val isRcs = false
+            var sendSucceeded = true
+
             // Send the message
             if (hasAttachment) {
                 val attachmentUri = currentAttachmentUri.value.toString()
-                SmsUtils.sendMediaMessage(
+                sendSucceeded = SmsUtils.sendMediaMessage(
                     getApplication(),
-                    recipient, 
-                    messageText, 
+                    recipient,
+                    messageText,
                     attachmentUri,
                     currentAttachmentType.value,
                     isRcs,
@@ -363,7 +365,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                 attachmentType = if (hasAttachment) currentAttachmentType.value else AttachmentType.NONE,
                 attachmentUri = currentAttachmentUri.value?.toString() ?: "",
                 attachmentContentType = currentAttachmentContentType.value,
-                sendStatus = SendStatus.SENDING
+                sendStatus = if (sendSucceeded) SendStatus.SENDING else SendStatus.FAILED
             )
             
             // Add to current conversation (maintaining chronological order)

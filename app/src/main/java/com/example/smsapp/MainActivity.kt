@@ -1,12 +1,17 @@
 package com.example.smsapp
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,6 +27,29 @@ import com.example.smsapp.viewmodel.SmsViewModel
 class MainActivity : ComponentActivity() {
     
     private val viewModel: SmsViewModel by viewModels()
+    private val messagesUpdatedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == SmsUtils.ACTION_MESSAGES_UPDATED) {
+                viewModel.loadMessages()
+                viewModel.loadContactGroups()
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(
+            this,
+            messagesUpdatedReceiver,
+            IntentFilter(SmsUtils.ACTION_MESSAGES_UPDATED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    override fun onStop() {
+        unregisterReceiver(messagesUpdatedReceiver)
+        super.onStop()
+    }
     
     override fun onResume() {
         super.onResume()

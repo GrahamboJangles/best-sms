@@ -3,8 +3,11 @@ package com.example.smsapp.util
 import android.content.Context
 import android.net.Uri
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 
 object PduUtils {
+    private const val MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L
+
 
     fun buildPdu(
         context: Context,
@@ -24,17 +27,31 @@ object PduUtils {
         }
         pdu.addPart(textPart)
 
-        // Add attachment part
-        context.contentResolver.openInputStream(attachmentUri)?.use { inputStream ->
-            val data = inputStream.readBytes()
-            val attachmentPart = PduPart().apply {
+        // Add attachment part. Read in chunks and fail instead of silently
+        // producing an MMS with a missing attachment.
+        val data = ByteArrayOutputStream().use { output ->
+            context.contentResolver.openInputStream(attachmentUri)?.use { inputStream ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var total = 0L
+                while (true) {
+                    val count = inputStream.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    if (total > MAX_ATTACHMENT_BYTES) {
+                        throw IOException("Attachment exceeds ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB MMS limit")
+                    }
+                    output.write(buffer, 0, count)
+                }
+            } ?: throw IOException("Unable to read attachment: $attachmentUri")
+            output.toByteArray()
+        }
+        val attachmentPart = PduPart().apply {
                 contentId = "attachment".toByteArray()
                 contentType = attachmentType.toByteArray()
-                this.data = data
-                fileName = getFileName(context, attachmentUri).toByteArray()
-            }
-            pdu.addPart(attachmentPart)
+            this.data = data
+            fileName = getFileName(context, attachmentUri).ifBlank { "attachment" }.toByteArray()
         }
+        pdu.addPart(attachmentPart)
 
         return pdu.make()
     }
