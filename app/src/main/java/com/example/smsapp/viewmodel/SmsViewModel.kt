@@ -21,7 +21,14 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     
     private companion object {
         const val TAG = "SmsViewModel"
+        const val PREFS_NAME = "conversation_preferences"
+        const val PINNED = "pinned"
+        const val ARCHIVED = "archived"
+        const val MUTED = "muted"
+        const val BLOCKED = "blocked"
     }
+
+    private val conversationPrefs = application.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
     
     // Messages for all conversations
     private val _allMessages = mutableStateListOf<SmsMessage>()
@@ -157,7 +164,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                                 lastMessageTimestamp = latestMessage.date,
                                 unreadCount = messages.count { it.read == 0 },
                                 hasRcsMessages = messages.any { it.isRcs }
-                            )
+                            ).withPreferences(conversationPrefs)
                             
                             conversations.add(conversation)
                         }
@@ -172,7 +179,10 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                         _allConversations.clear()
                         _allConversations.addAll(conversations)
                         _conversations.clear()
-                        _conversations.addAll(conversations)
+                        _allConversations.clear()
+                        _allConversations.addAll(conversations.map { it.withPreferences(conversationPrefs) })
+                        _conversations.clear()
+                        _conversations.addAll(_allConversations)
                         updateFilteredConversations()
                     }
                 } catch (e: Exception) {
@@ -223,7 +233,8 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         
         if (selectedGroupId.value == "all") {
             // Show all conversations
-            _conversations.addAll(_allConversations)
+                                _conversations.addAll(_allConversations.filterNot { it.isArchived || it.isBlocked })
+
         } else {
             // Filter by group
             val group = _groups.find { it.id == selectedGroupId.value }
@@ -233,7 +244,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                         SmsUtils.phoneNumbersMatch(getApplication(), groupNumber, conversation.address)
                     }
                 }
-                _conversations.addAll(filteredConversations)
+                _conversations.addAll(filteredConversations.filterNot { it.isArchived || it.isBlocked })
             }
         }
 
@@ -247,6 +258,44 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
+    private fun Conversation.withPreferences(prefs: android.content.SharedPreferences): Conversation {
+        return copy(
+            isPinned = prefs.getStringSet(PINNED, emptySet())?.contains(address) == true,
+            isArchived = prefs.getStringSet(ARCHIVED, emptySet())?.contains(address) == true,
+            isMuted = prefs.getStringSet(MUTED, emptySet())?.contains(address) == true,
+            isBlocked = prefs.getStringSet(BLOCKED, emptySet())?.contains(address) == true
+        )
+    }
+
+    private fun updateConversationPreference(key: String, address: String, enabled: Boolean) {
+        val values = conversationPrefs.getStringSet(key, emptySet()).orEmpty().toMutableSet()
+        if (enabled) values.add(address) else values.remove(address)
+        conversationPrefs.edit().putStringSet(key, values).apply()
+        val index = _allConversations.indexOfFirst { it.address == address }
+        if (index >= 0) _allConversations[index] = _allConversations[index].withPreferences(conversationPrefs)
+        filterConversationsByGroup()
+    }
+
+    fun togglePinned(address: String) {
+        val conversation = _allConversations.find { it.address == address } ?: return
+        updateConversationPreference(PINNED, address, !conversation.isPinned)
+    }
+
+    fun toggleArchived(address: String) {
+        val conversation = _allConversations.find { it.address == address } ?: return
+        updateConversationPreference(ARCHIVED, address, !conversation.isArchived)
+    }
+
+    fun toggleMuted(address: String) {
+        val conversation = _allConversations.find { it.address == address } ?: return
+        updateConversationPreference(MUTED, address, !conversation.isMuted)
+    }
+
+    fun toggleBlocked(address: String) {
+        val conversation = _allConversations.find { it.address == address } ?: return
+        updateConversationPreference(BLOCKED, address, !conversation.isBlocked)
+    }
+
     fun selectGroup(groupId: String) {
         selectedGroupId.value = groupId
         filterConversationsByGroup()

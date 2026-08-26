@@ -2,10 +2,14 @@ package com.example.smsapp.util
 
 import android.Manifest
 import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.role.RoleManager
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import androidx.core.app.NotificationCompat
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
@@ -195,6 +199,37 @@ object SmsUtils {
     )
 
     const val ACTION_MESSAGES_UPDATED = "com.example.smsapp.ACTION_MESSAGES_UPDATED"
+    private const val NOTIFICATION_CHANNEL_ID = "incoming_messages"
+    private const val NOTIFICATION_ID = 4101
+
+    fun showIncomingMessageNotification(context: Context, sender: String, body: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(NOTIFICATION_CHANNEL_ID, "Incoming messages", NotificationManager.IMPORTANCE_HIGH)
+            )
+        }
+        val intent = Intent(context, com.example.smsapp.MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(com.example.smsapp.R.mipmap.ic_launcher)
+            .setContentTitle(sender.ifBlank { "New message" })
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        manager.notify(NOTIFICATION_ID, notification)
+    }
 
     fun refreshMessages(context: Context) {
         try {
@@ -236,12 +271,13 @@ object SmsUtils {
     }
     
     fun requestSmsPermission(activity: Activity) {
-        val permissions = arrayOf(
-            Manifest.permission.SEND_SMS,
-            Manifest.permission.READ_SMS,
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_CONTACTS
-        )
+            val permissions = arrayOf(
+                Manifest.permission.SEND_SMS,
+                Manifest.permission.READ_SMS,
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
         
         ActivityCompat.requestPermissions(activity, permissions, SMS_PERMISSION_REQUEST_CODE)
     }

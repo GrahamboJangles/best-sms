@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.smsapp.model.Conversation
 import com.example.smsapp.ui.components.ConversationItem
 import com.example.smsapp.ui.components.GroupTab
 import com.example.smsapp.viewmodel.SmsViewModel
@@ -47,6 +48,7 @@ import androidx.compose.material3.AlertDialog
 fun ConversationListScreen(viewModel: SmsViewModel) {
     var showDebugDialog by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var selectedConversationForMenu by remember { mutableStateOf<Conversation?>(null) }
     val selectedGroupId by remember { viewModel.selectedGroupId }
     val globalSearchQuery by remember { viewModel.globalSearchQuery }
     val diagnosticInfo by remember { viewModel.diagnosticInfo }
@@ -170,6 +172,9 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                             onClick = {
                                 viewModel.selectConversation(conversation.address)
                             },
+                            onLongClick = {
+                                selectedConversationForMenu = conversation
+                            }
                         )
                     }
                 }
@@ -177,6 +182,38 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
         }
         
         
+
+        selectedConversationForMenu?.let { conversation ->
+            AlertDialog(
+                onDismissRequest = { selectedConversationForMenu = null },
+                title = { Text(conversation.contactName.ifBlank { conversation.address }) },
+                text = {
+                    Column {
+                        androidx.compose.material3.TextButton(onClick = {
+                            viewModel.togglePinned(conversation.address)
+                            selectedConversationForMenu = null
+                        }) { Text(if (conversation.isPinned) "Unpin conversation" else "Pin conversation") }
+                        androidx.compose.material3.TextButton(onClick = {
+                            viewModel.toggleArchived(conversation.address)
+                            selectedConversationForMenu = null
+                        }) { Text(if (conversation.isArchived) "Unarchive conversation" else "Archive conversation") }
+                        androidx.compose.material3.TextButton(onClick = {
+                            viewModel.toggleMuted(conversation.address)
+                            selectedConversationForMenu = null
+                        }) { Text(if (conversation.isMuted) "Unmute notifications" else "Mute notifications") }
+                        androidx.compose.material3.TextButton(onClick = {
+                            viewModel.toggleBlocked(conversation.address)
+                            selectedConversationForMenu = null
+                        }) { Text(if (conversation.isBlocked) "Unblock sender" else "Block sender") }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { selectedConversationForMenu = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
 
         // Debug info dialog
         if (showDebugDialog) {

@@ -19,6 +19,7 @@ class SmsReceiver : BroadcastReceiver() {
                 val body = messages.joinToString(separator = "") { it.displayMessageBody }
 
                 Log.d("SmsReceiver", "Incoming SMS from $from: $body")
+                SmsUtils.showIncomingMessageNotification(context, from, body)
 
                 // When default, these messages are already persisted by the system.
                 // Force a refresh so the UI shows them immediately.

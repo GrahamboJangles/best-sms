@@ -7,5 +7,9 @@ data class Conversation(
     val lastMessagePreview: String,
     val lastMessageTimestamp: Long,
     val unreadCount: Int = 0,
-    val hasRcsMessages: Boolean = false
+    val hasRcsMessages: Boolean = false,
+    val isPinned: Boolean = false,
+    val isArchived: Boolean = false,
+    val isMuted: Boolean = false,
+    val isBlocked: Boolean = false
 ) 
