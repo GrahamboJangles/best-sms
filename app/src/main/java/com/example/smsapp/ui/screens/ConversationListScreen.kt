@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
@@ -51,6 +52,7 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
     var selectedConversationForMenu by remember { mutableStateOf<Conversation?>(null) }
     val selectedGroupId by remember { viewModel.selectedGroupId }
     val globalSearchQuery by remember { viewModel.globalSearchQuery }
+    val showArchived by remember { viewModel.showArchived }
     val diagnosticInfo by remember { viewModel.diagnosticInfo }
     
     Scaffold(
@@ -77,6 +79,12 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                         Icon(
                             imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = if (showSearch) "Close search" else "Search messages"
+                        )
+                    }
+                    IconButton(onClick = { viewModel.toggleArchivedView() }) {
+                        Icon(
+                            imageVector = Icons.Default.Archive,
+                            contentDescription = if (showArchived) "Hide archived" else "Show archived"
                         )
                     }
                     // Debug info button

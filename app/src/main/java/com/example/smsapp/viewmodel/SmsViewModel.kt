@@ -54,6 +54,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     // Message search state
     val globalSearchQuery = mutableStateOf("")
     val conversationSearchQuery = mutableStateOf("")
+    val showArchived = mutableStateOf(false)
     
     // Dialog state for group creation
     val showGroupDialog = mutableStateOf(false)
@@ -233,7 +234,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         
         if (selectedGroupId.value == "all") {
             // Show all conversations
-                                _conversations.addAll(_allConversations.filterNot { it.isArchived || it.isBlocked })
+                                _conversations.addAll(_allConversations.filterNot { it.isBlocked || (!showArchived.value && it.isArchived) })
 
         } else {
             // Filter by group
@@ -244,7 +245,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                         SmsUtils.phoneNumbersMatch(getApplication(), groupNumber, conversation.address)
                     }
                 }
-                _conversations.addAll(filteredConversations.filterNot { it.isArchived || it.isBlocked })
+                _conversations.addAll(filteredConversations.filterNot { it.isBlocked || (!showArchived.value && it.isArchived) })
             }
         }
 
@@ -256,6 +257,12 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
                 .toSet()
             _conversations.retainAll { it.address in matchingAddresses }
         }
+        _conversations.sortWith(compareByDescending<Conversation> { it.isPinned }.thenByDescending { it.lastMessageTimestamp })
+    }
+
+    fun toggleArchivedView() {
+        showArchived.value = !showArchived.value
+        filterConversationsByGroup()
     }
     
     private fun Conversation.withPreferences(prefs: android.content.SharedPreferences): Conversation {
