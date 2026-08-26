@@ -2,7 +2,7 @@
 
 BestSMS is an Android SMS/MMS application focused on reliable messaging, Samsung/Android Contacts group integration, privacy-aware media sharing, search, scheduling, and a clean contributor-friendly foundation.
 
-> **Current transport boundary:** BestSMS uses documented Android SMS/MMS and Contacts Provider APIs. It does not impersonate or reverse-engineer private Google Messages or Samsung Messages RCS services.
+> **Current transport boundary:** BestSMS uses documented Android SMS/MMS and Contacts Provider APIs. It does not yet impersonate or reverse-engineer private Google Messages or Samsung Messages RCS services.
 
 ## Features
 
