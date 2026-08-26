@@ -66,6 +66,9 @@
         <receiver
             android:name=".receiver.ScheduledSmsReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".receiver.SmsReplyReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".receiver.MmsReceiver"

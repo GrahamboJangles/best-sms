@@ -10,6 +10,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
@@ -218,6 +219,22 @@ object SmsUtils {
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val replyIntent = Intent(context, com.example.smsapp.receiver.SmsReplyReceiver::class.java).apply {
+            putExtra(com.example.smsapp.receiver.SmsReplyReceiver.EXTRA_RECIPIENT, sender)
+        }
+        val replyPendingIntent = PendingIntent.getBroadcast(
+            context, sender.hashCode(), replyIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        val remoteInput = RemoteInput.Builder(com.example.smsapp.receiver.SmsReplyReceiver.KEY_TEXT)
+            .setLabel("Reply")
+            .build()
+        val replyAction = NotificationCompat.Action.Builder(
+            android.R.drawable.ic_menu_send,
+            "Reply",
+            replyPendingIntent
+        ).addRemoteInput(remoteInput).build()
+
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(com.example.smsapp.R.mipmap.ic_launcher)
             .setContentTitle(sender.ifBlank { "New message" })
@@ -227,6 +244,7 @@ object SmsUtils {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .addAction(replyAction)
             .build()
         manager.notify(NOTIFICATION_ID, notification)
     }

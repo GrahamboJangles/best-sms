@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,11 +61,19 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
     val showArchived by remember { viewModel.showArchived }
     val diagnosticInfo by remember { viewModel.diagnosticInfo }
     val context = LocalContext.current
-    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
             context.contentResolver.openOutputStream(uri)?.use { output ->
-                output.write(viewModel.exportBackupText().toByteArray())
+                output.write(viewModel.exportBackupJson().toByteArray())
             }
+        }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val restored = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                viewModel.restoreBackupJson(reader.readText())
+            } ?: false
+            android.widget.Toast.makeText(context, if (restored) "Backup restored" else "Invalid BestSMS backup", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -94,9 +104,12 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                         )
                     }
                     IconButton(onClick = {
-                        backupLauncher.launch("bestsms-backup-${System.currentTimeMillis()}.txt")
+                        backupLauncher.launch("bestsms-backup-${System.currentTimeMillis()}.json")
                     }) {
                         Icon(Icons.Default.FileDownload, contentDescription = "Export backup")
+                    }
+                    IconButton(onClick = { restoreLauncher.launch("application/json") }) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Restore backup")
                     }
                     IconButton(onClick = { viewModel.toggleArchivedView() }) {
                         Icon(

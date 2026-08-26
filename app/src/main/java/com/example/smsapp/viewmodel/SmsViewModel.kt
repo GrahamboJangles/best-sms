@@ -21,6 +21,7 @@ import com.example.smsapp.util.SmsUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class SmsViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -267,6 +268,50 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             _conversations.retainAll { it.address in matchingAddresses }
         }
         _conversations.sortWith(compareByDescending<Conversation> { it.isPinned }.thenByDescending { it.lastMessageTimestamp })
+    }
+
+    fun exportBackupJson(): String {
+        val root = JSONObject()
+        root.put("format", "bestsms-backup-v2")
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("draftRecipient", draftPrefs.getString(DRAFT_RECIPIENT, "") ?: "")
+        root.put("draftMessage", draftPrefs.getString(DRAFT_MESSAGE, "") ?: "")
+        val preferences = JSONObject()
+        conversationPrefs.all.forEach { (key, value) ->
+            when (value) {
+                is Boolean -> preferences.put(key, value)
+                is String -> preferences.put(key, value)
+            }
+        }
+        root.put("conversationPreferences", preferences)
+        root.put("messages", exportBackupText())
+        return root.toString(2)
+    }
+
+    fun restoreBackupJson(json: String): Boolean {
+        return runCatching {
+            val root = JSONObject(json)
+            require(root.optString("format") == "bestsms-backup-v2")
+            draftPrefs.edit()
+                .putString(DRAFT_RECIPIENT, root.optString("draftRecipient"))
+                .putString(DRAFT_MESSAGE, root.optString("draftMessage"))
+                .apply()
+            val preferences = root.optJSONObject("conversationPreferences")
+            if (preferences != null) {
+                val editor = conversationPrefs.edit()
+                preferences.keys().forEach { key ->
+                    when (val value = preferences.get(key)) {
+                        is Boolean -> editor.putBoolean(key, value)
+                        is String -> editor.putString(key, value)
+                    }
+                }
+                editor.apply()
+            }
+            currentRecipient.value = draftPrefs.getString(DRAFT_RECIPIENT, "") ?: ""
+            currentMessage.value = draftPrefs.getString(DRAFT_MESSAGE, "") ?: ""
+            loadMessages()
+            true
+        }.getOrDefault(false)
     }
 
     fun exportBackupText(): String {
