@@ -44,16 +44,20 @@ fun ConversationItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick ?: {}
-            )
+            ),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Contact avatar
@@ -87,8 +91,8 @@ fun ConversationItem(
                                 conversation.contactName 
                             else 
                                 conversation.address,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.Medium,
                             modifier = Modifier.weight(1f)
                         )
 
@@ -140,6 +144,7 @@ fun ConversationItem(
                             Text(
                                 text = conversation.lastMessagePreview,
                                 style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (conversation.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -157,9 +162,6 @@ fun ConversationItem(
                 }
             }
             
-            Divider(
-                modifier = Modifier.padding(start = 74.dp)
-            )
         }
     }
 } 

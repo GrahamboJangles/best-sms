@@ -69,8 +69,8 @@ fun MessageItem(
     val isIncoming = message.type == android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX
     val alignment = if (isIncoming) Alignment.CenterStart else Alignment.CenterEnd
     val backgroundColor = when {
-        !isIncoming && message.sendStatus == SendStatus.SENDING -> Color.Gray
-        !isIncoming && message.sendStatus == SendStatus.FAILED -> Color.Red
+        !isIncoming && message.sendStatus == SendStatus.SENDING -> MaterialTheme.colorScheme.surfaceVariant
+        !isIncoming && message.sendStatus == SendStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
         isIncoming -> MaterialTheme.colorScheme.secondaryContainer
         else -> MaterialTheme.colorScheme.primaryContainer
     }
@@ -81,7 +81,7 @@ fun MessageItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(horizontal = 12.dp, vertical = 5.dp)
             .combinedClickable(
                 onClick = { },
                 onLongClick = { onLongClick?.invoke(message) }
@@ -100,7 +100,7 @@ fun MessageItem(
                     )
                 )
                 .background(backgroundColor)
-                .padding(12.dp)
+                .padding(horizontal = 16.dp, vertical = 11.dp)
         ) {
             if (isIncoming) {
                 Text(
