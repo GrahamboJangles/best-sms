@@ -1,11 +1,14 @@
 package com.example.smsapp.ui.components
 
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +45,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -139,6 +143,9 @@ fun MessageItem(
                     text = message.body,
                     style = MaterialTheme.typography.bodyLarge
                 )
+                message.body.extractWebUrl()?.let { url ->
+                    LinkPreviewCard(url = url)
+                }
             }
             
             Spacer(modifier = Modifier.height(4.dp))
@@ -197,6 +204,37 @@ fun MessageItem(
                     color = MaterialTheme.colorScheme.outline
                 )
             }
+        }
+    }
+}
+
+private fun String.extractWebUrl(): String? {
+    val match = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE).find(this) ?: return null
+    return match.value.trimEnd('.', ',', '!', '?', ')', ']')
+}
+
+@Composable
+private fun LinkPreviewCard(url: String) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clickable {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            }
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text("Web link", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = Uri.parse(url).host ?: url,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(url, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

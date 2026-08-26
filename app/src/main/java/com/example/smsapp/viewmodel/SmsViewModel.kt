@@ -467,19 +467,22 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             var sendSucceeded = true
 
             // Send the message
+            val recipients = SmsUtils.parseRecipients(recipient)
             if (hasAttachment) {
                 val attachmentUri = currentAttachmentUri.value.toString()
-                sendSucceeded = SmsUtils.sendMediaMessage(
-                    getApplication(),
-                    recipient,
-                    messageText,
-                    attachmentUri,
-                    currentAttachmentType.value,
-                    isRcs,
-                    currentAttachmentContentType.value
-                )
+                sendSucceeded = recipients.isNotEmpty() && recipients.all { destination ->
+                    SmsUtils.sendMediaMessage(
+                        getApplication(),
+                        destination,
+                        messageText,
+                        attachmentUri,
+                        currentAttachmentType.value,
+                        isRcs,
+                        currentAttachmentContentType.value
+                    )
+                }
             } else {
-                SmsUtils.sendSms(recipient, messageText)
+                sendSucceeded = SmsUtils.sendSmsToRecipients(recipient, messageText)
             }
             
             // Look up contact name

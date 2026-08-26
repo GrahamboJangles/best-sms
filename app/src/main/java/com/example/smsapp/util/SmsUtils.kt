@@ -293,13 +293,30 @@ object SmsUtils {
                 PackageManager.PERMISSION_GRANTED
     }
     
-    fun sendSms(phoneNumber: String, message: String) {
-        try {
-            val smsManager = SmsManager.getDefault()
-            smsManager.sendTextMessage(phoneNumber, null, message, null, null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending SMS: ${e.message}", e)
+    fun parseRecipients(raw: String): List<String> {
+        return raw.split(',', ';', '\n')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
+    fun sendSmsToRecipients(rawRecipients: String, message: String): Boolean {
+        val recipients = parseRecipients(rawRecipients)
+        if (recipients.isEmpty() || message.isBlank()) return false
+        var success = true
+        recipients.forEach { recipient ->
+            try {
+                SmsManager.getDefault().sendTextMessage(recipient, null, message, null, null)
+            } catch (e: Exception) {
+                success = false
+                Log.e(TAG, "Error sending SMS to $recipient: ${e.message}", e)
+            }
         }
+        return success
+    }
+
+    fun sendSms(phoneNumber: String, message: String) {
+        sendSmsToRecipients(phoneNumber, message)
     }
     
     fun markConversationRead(context: Context, address: String) {

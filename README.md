@@ -12,6 +12,8 @@ BestSMS is an Android SMS/MMS application focused on reliable messaging, Samsung
 | MMS | Send image/video/audio/document attachments, read standard MMS parts, render received image/video media, and report attachment failures. |
 | Contact groups | Mirror Samsung/Android Contacts groups, merge duplicate group names, and filter conversations by group. |
 | Search | Search message text across all conversations or within one conversation. |
+| Link previews | Detect HTTPS links locally, show a tappable domain/URL card, and open the browser on tap without fetching page content in the background. |
+| Group texts | Enter comma-, semicolon-, or newline-separated recipients; SMS fans out to each recipient. Group MMS media is sent individually to each recipient because carrier group-MMS behavior is not uniform. |
 | Inbox organization | Pin, mute, archive, block, show archived conversations, and display pinned/muted indicators. |
 | Reliability | Draft recovery, failed-message retry, incoming-message refresh, notifications, and scheduled SMS. |
 | Privacy | Ask before sending images/videos whether metadata should be stripped; rewrite images and supported video containers before sending. |
@@ -69,7 +71,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 BestSMS is designed to operate as the device’s default SMS application. On a test device, install the debug APK, select BestSMS as the default SMS app when prompted, grant SMS and Contacts permissions, and grant notification and call permissions when requested. Test SMS and MMS behavior on a real carrier-connected device because emulator and carrier configurations do not reproduce every MMS condition.
 
-Important manual tests include receiving and sending SMS, opening a conversation to mark messages read, selecting an image or video and choosing both metadata options, scheduling a message for a future date and time, retrying a failed send, exporting a backup, pinning and muting a conversation, and using the call button in an active conversation.
+Important manual tests include receiving and sending SMS, opening a conversation to mark messages read, selecting an image or video and choosing both metadata options, scheduling a message for a future date and time, retrying a failed send, exporting a backup, pinning and muting a conversation, using the call button in an active conversation, sending to comma-separated recipients, and tapping an HTTPS link preview. Link cards are local URL detection rather than remote webpage scraping, which avoids silently sending message content or browsing history to a preview service.
 
 ## Contributing
 

@@ -324,7 +324,8 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                         OutlinedTextField(
                             value = currentRecipient,
                             onValueChange = viewModel::updateRecipient,
-                            label = { Text("Recipient") },
+                            label = { Text("Recipient(s)") },
+                            supportingText = { Text("Separate multiple numbers with commas, semicolons, or new lines") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp),
