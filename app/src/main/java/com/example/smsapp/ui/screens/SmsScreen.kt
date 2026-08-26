@@ -2,6 +2,8 @@ package com.example.smsapp.ui.screens
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
@@ -244,6 +247,24 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                 },
                 actions = {
                     if (currentContact.isNotEmpty()) {
+                        IconButton(onClick = {
+                            val callIntent = Intent(Intent.ACTION_CALL).apply {
+                                data = Uri.parse("tel:${Uri.encode(currentContact)}")
+                            }
+                            try {
+                                context.startActivity(callIntent)
+                            } catch (_: SecurityException) {
+                                context.startActivity(Intent(Intent.ACTION_DIAL).apply {
+                                    data = Uri.parse("tel:${Uri.encode(currentContact)}")
+                                })
+                            } catch (_: ActivityNotFoundException) {
+                                context.startActivity(Intent(Intent.ACTION_DIAL).apply {
+                                    data = Uri.parse("tel:${Uri.encode(currentContact)}")
+                                })
+                            }
+                        }) {
+                            Icon(Icons.Default.Call, contentDescription = "Call contact")
+                        }
                         IconButton(onClick = {
                             showConversationSearch = !showConversationSearch
                             if (!showConversationSearch) viewModel.clearConversationSearch()
