@@ -23,6 +23,13 @@ class MainActivity : ComponentActivity() {
     
     private val viewModel: SmsViewModel by viewModels()
     
+    override fun onResume() {
+        super.onResume()
+        if (SmsUtils.hasPermissions(this)) {
+            viewModel.loadContactGroups()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

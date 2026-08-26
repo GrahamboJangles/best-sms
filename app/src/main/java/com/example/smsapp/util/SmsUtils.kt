@@ -21,6 +21,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.smsapp.model.AttachmentType
+import com.example.smsapp.model.ContactGroup
 import com.example.smsapp.model.SmsMessage
 import java.io.File
 import java.io.FileOutputStream
@@ -596,6 +597,125 @@ object SmsUtils {
         return messages
     }
     
+    /**
+     * Read groups and phone memberships from Android's Contacts Provider.
+     * Samsung Contacts stores its groups in the same provider, so this works
+     * without depending on Samsung-private provider authorities.
+     */
+    fun retrieveContactGroups(context: Context): List<ContactGroup> {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return emptyList()
+        }
+
+        val groups = linkedMapOf<Long, String>()
+        val groupContacts = mutableMapOf<Long, MutableSet<String>>()
+        val resolver = context.contentResolver
+
+        try {
+            resolver.query(
+                ContactsContract.Groups.CONTENT_URI,
+                arrayOf(ContactsContract.Groups._ID, ContactsContract.Groups.TITLE, ContactsContract.Groups.GROUP_VISIBLE),
+                null,
+                null,
+                "${ContactsContract.Groups.TITLE} COLLATE NOCASE ASC"
+            )?.use { cursor ->
+                val idIndex = cursor.getColumnIndex(ContactsContract.Groups._ID)
+                val titleIndex = cursor.getColumnIndex(ContactsContract.Groups.TITLE)
+                if (idIndex >= 0 && titleIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idIndex)
+                        val title = cursor.getString(titleIndex)?.trim().orEmpty()
+                        if (title.isNotEmpty()) {
+                            groups[id] = title
+                            groupContacts[id] = linkedSetOf()
+                        }
+                    }
+                }
+            }
+
+            if (groups.isEmpty()) return emptyList()
+
+            val phoneNumbersByRawContact = mutableMapOf<Long, MutableList<String>>()
+            resolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.RAW_CONTACT_ID,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val rawIdIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.RAW_CONTACT_ID)
+                val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                if (rawIdIndex >= 0 && numberIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        val rawContactId = cursor.getLong(rawIdIndex)
+                        val number = cursor.getString(numberIndex)?.trim().orEmpty()
+                        if (number.isNotEmpty()) {
+                            phoneNumbersByRawContact.getOrPut(rawContactId) { mutableListOf() }.add(number)
+                        }
+                    }
+                }
+            }
+
+            resolver.query(
+                ContactsContract.Data.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.Data.RAW_CONTACT_ID,
+                    ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID
+                ),
+                "${ContactsContract.Data.MIMETYPE} = ?",
+                arrayOf(ContactsContract.CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE),
+                null
+            )?.use { cursor ->
+                val rawIdIndex = cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID)
+                val groupIdIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID)
+                if (rawIdIndex >= 0 && groupIdIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        val rawContactId = cursor.getLong(rawIdIndex)
+                        if (cursor.isNull(groupIdIndex)) continue
+                        val groupId = cursor.getLong(groupIdIndex)
+                        val destination = groupContacts[groupId] ?: continue
+                        destination.addAll(phoneNumbersByRawContact[rawContactId].orEmpty())
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error retrieving contact groups", e)
+            return emptyList()
+        }
+
+        // Samsung/Android can expose separate group rows with the same visible
+        // name (for example, after accounts are merged). Present one tab per
+        // name and combine all memberships into that tab.
+        val mergedGroups = linkedMapOf<String, Pair<String, MutableSet<String>>>()
+        groups.forEach { (id, name) ->
+            val nameKey = name.trim().lowercase(Locale.ROOT)
+            val merged = mergedGroups.getOrPut(nameKey) {
+                name to linkedSetOf()
+            }
+            merged.second.addAll(groupContacts[id].orEmpty())
+        }
+
+        return mergedGroups.map { (nameKey, group) ->
+            ContactGroup(
+                id = "contacts_group_${nameKey.hashCode()}",
+                name = group.first,
+                contacts = group.second.toList()
+            )
+        }
+    }
+
+    /** Compare phone numbers using Android's locale-aware phone matching. */
+    fun phoneNumbersMatch(context: Context, first: String, second: String): Boolean {
+        return try {
+            PhoneNumberUtils.compare(context, first, second)
+        } catch (e: Exception) {
+            PhoneNumberUtils.normalizeNumber(first) == PhoneNumberUtils.normalizeNumber(second)
+        }
+    }
+
     /**
      * Lookup contact name by phone number
      */

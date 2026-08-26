@@ -14,12 +14,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,8 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.smsapp.ui.components.AddGroupDialog
-import com.example.smsapp.ui.components.AddToGroupDialog
 import com.example.smsapp.ui.components.ConversationItem
 import com.example.smsapp.ui.components.GroupTab
 import com.example.smsapp.viewmodel.SmsViewModel
@@ -45,32 +45,43 @@ import androidx.compose.material3.AlertDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationListScreen(viewModel: SmsViewModel) {
-    // State for dialogs
-    var showAddToGroupDialog by remember { mutableStateOf(false) }
-    var selectedContactForGroup by remember { mutableStateOf("") }
     var showDebugDialog by remember { mutableStateOf(false) }
-    val showGroupDialog by remember { viewModel.showGroupDialog }
-    val newGroupName by remember { viewModel.newGroupName }
+    var showSearch by remember { mutableStateOf(false) }
     val selectedGroupId by remember { viewModel.selectedGroupId }
+    val globalSearchQuery by remember { viewModel.globalSearchQuery }
     val diagnosticInfo by remember { viewModel.diagnosticInfo }
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Messages") },
+                title = {
+                    if (showSearch) {
+                        OutlinedTextField(
+                            value = globalSearchQuery,
+                            onValueChange = viewModel::setGlobalSearchQuery,
+                            placeholder = { Text("Search all texts") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text("Messages")
+                    }
+                },
                 actions = {
+                    IconButton(onClick = {
+                        showSearch = !showSearch
+                        if (!showSearch) viewModel.setGlobalSearchQuery("")
+                    }) {
+                        Icon(
+                            imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (showSearch) "Close search" else "Search messages"
+                        )
+                    }
                     // Debug info button
                     IconButton(onClick = { showDebugDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Debug Info"
-                        )
-                    }
-                    // Add new group button
-                    IconButton(onClick = { viewModel.showGroupDialog.value = true }) {
-                        Icon(
-                            imageVector = Icons.Default.AddCircle,
-                            contentDescription = "Add Group"
                         )
                     }
                 }
@@ -108,7 +119,7 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 
-                // Custom group tabs
+                // Groups imported from Samsung/Android Contacts
                 items(viewModel.groups) { group ->
                     GroupTab(
                         name = group.name,
@@ -127,7 +138,13 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (selectedGroupId == "all") {
+                    if (globalSearchQuery.isNotBlank()) {
+                        Text(
+                            text = "No messages match your search",
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    } else if (selectedGroupId == "all") {
                         Text(
                             text = "No conversations yet\nTap + to start a new conversation",
                             textAlign = TextAlign.Center,
@@ -135,7 +152,7 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                         )
                     } else {
                         Text(
-                            text = "No conversations in this group\nLong-press on a conversation to add it to this group",
+                            text = "No conversations in this group\nManage group membership in Samsung Contacts",
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -153,36 +170,13 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                             onClick = {
                                 viewModel.selectConversation(conversation.address)
                             },
-                            onLongClick = {
-                                selectedContactForGroup = conversation.address
-                                showAddToGroupDialog = true
-                            }
                         )
                     }
                 }
             }
         }
         
-        // Group management dialogs
-        if (showAddToGroupDialog) {
-            AddToGroupDialog(
-                contactAddress = selectedContactForGroup,
-                groups = viewModel.groups,
-                isInGroup = viewModel::isContactInGroup,
-                onAddToGroup = viewModel::addContactToGroup,
-                onRemoveFromGroup = viewModel::removeContactFromGroup,
-                onDismiss = { showAddToGroupDialog = false }
-            )
-        }
         
-        if (showGroupDialog) {
-            AddGroupDialog(
-                groupName = newGroupName,
-                onGroupNameChange = { viewModel.newGroupName.value = it },
-                onAddGroup = { viewModel.addGroup(newGroupName) },
-                onDismiss = { viewModel.showGroupDialog.value = false }
-            )
-        }
 
         // Debug info dialog
         if (showDebugDialog) {

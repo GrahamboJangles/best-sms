@@ -43,6 +43,10 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     
     // Current group selection ("all" is a special value for all conversations)
     val selectedGroupId = mutableStateOf("all")
+
+    // Message search state
+    val globalSearchQuery = mutableStateOf("")
+    val conversationSearchQuery = mutableStateOf("")
     
     // Dialog state for group creation
     val showGroupDialog = mutableStateOf(false)
@@ -80,34 +84,28 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     
     init {
         checkPermissions()
-        initDefaultGroups()
     }
-    
-    private fun initDefaultGroups() {
-        // Add default "All" group (implicit, not needed in the actual group list)
-        // Add a "Favorites" group
-        _groups.add(ContactGroup(
-            id = "favorites",
-            name = "Favorites"
-        ))
-        
-        // Add "Family" group
-        _groups.add(ContactGroup(
-            id = "family",
-            name = "Family"
-        ))
-        
-        // Add "Work" group
-        _groups.add(ContactGroup(
-            id = "work",
-            name = "Work"
-        ))
-    }
-    
+
     fun checkPermissions() {
         permissionsGranted.value = SmsUtils.hasPermissions(getApplication())
         if (permissionsGranted.value) {
+            loadContactGroups()
             loadMessages()
+        }
+    }
+
+    /** Reload groups from Samsung Contacts/Android Contacts Provider. */
+    fun loadContactGroups() {
+        viewModelScope.launch {
+            val importedGroups = withContext(Dispatchers.IO) {
+                SmsUtils.retrieveContactGroups(getApplication())
+            }
+            _groups.clear()
+            _groups.addAll(importedGroups)
+            if (selectedGroupId.value != "all" && importedGroups.none { it.id == selectedGroupId.value }) {
+                selectedGroupId.value = "all"
+            }
+            filterConversationsByGroup()
         }
     }
     
@@ -190,6 +188,35 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateFilteredConversations() {
         filterConversationsByGroup()
     }
+
+    fun setGlobalSearchQuery(query: String) {
+        globalSearchQuery.value = query
+        filterConversationsByGroup()
+    }
+
+    fun setConversationSearchQuery(query: String) {
+        conversationSearchQuery.value = query
+        refreshCurrentConversationMessages()
+    }
+
+    fun clearConversationSearch() {
+        conversationSearchQuery.value = ""
+        refreshCurrentConversationMessages()
+    }
+
+    private fun refreshCurrentConversationMessages() {
+        val address = currentContact.value
+        if (address.isEmpty()) return
+        val query = conversationSearchQuery.value.trim()
+        val filteredMessages = _allMessages
+            .asSequence()
+            .filter { it.address == address }
+            .filter { query.isEmpty() || it.body.contains(query, ignoreCase = true) }
+            .sortedBy { it.date }
+            .toList()
+        _messages.clear()
+        _messages.addAll(filteredMessages)
+    }
     
     fun filterConversationsByGroup() {
         _conversations.clear()
@@ -201,11 +228,22 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             // Filter by group
             val group = _groups.find { it.id == selectedGroupId.value }
             if (group != null) {
-                val filteredConversations = _allConversations.filter { 
-                    group.contacts.contains(it.address) 
+                val filteredConversations = _allConversations.filter { conversation ->
+                    group.contacts.any { groupNumber ->
+                        SmsUtils.phoneNumbersMatch(getApplication(), groupNumber, conversation.address)
+                    }
                 }
                 _conversations.addAll(filteredConversations)
             }
+        }
+
+        val query = globalSearchQuery.value.trim()
+        if (query.isNotEmpty()) {
+            val matchingAddresses = _allMessages
+                .filter { it.body.contains(query, ignoreCase = true) }
+                .map { it.address }
+                .toSet()
+            _conversations.retainAll { it.address in matchingAddresses }
         }
     }
     
@@ -215,12 +253,10 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun addGroup(name: String) {
-        if (name.isNotEmpty()) {
-            val newGroupId = "group_${System.currentTimeMillis()}"
-            _groups.add(ContactGroup(id = newGroupId, name = name))
-            newGroupName.value = ""
-            showGroupDialog.value = false
-        }
+        // Contact groups are owned by Samsung/Android Contacts and are read-only here.
+        // Keep this callback as a no-op for compatibility with the existing dialog.
+        newGroupName.value = ""
+        showGroupDialog.value = false
     }
     
     fun deleteGroup(groupId: String) {
@@ -232,46 +268,24 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun addContactToGroup(groupId: String, contactAddress: String) {
-        val index = _groups.indexOfFirst { it.id == groupId }
-        if (index >= 0) {
-            val group = _groups[index]
-            val updatedContacts = group.contacts.toMutableList()
-            
-            if (!updatedContacts.contains(contactAddress)) {
-                updatedContacts.add(contactAddress)
-                _groups[index] = group.copy(contacts = updatedContacts)
-                
-                // Refresh filtered list if we're currently viewing this group
-                if (selectedGroupId.value == groupId) {
-                    filterConversationsByGroup()
-                }
-            }
-        }
+        // Membership is managed in Samsung Contacts; the SMS app only mirrors it.
     }
-    
+
     fun removeContactFromGroup(groupId: String, contactAddress: String) {
-        val index = _groups.indexOfFirst { it.id == groupId }
-        if (index >= 0) {
-            val group = _groups[index]
-            val updatedContacts = group.contacts.toMutableList()
-            
-            if (updatedContacts.remove(contactAddress)) {
-                _groups[index] = group.copy(contacts = updatedContacts)
-                
-                // Refresh filtered list if we're currently viewing this group
-                if (selectedGroupId.value == groupId) {
-                    filterConversationsByGroup()
-                }
-            }
-        }
+        // Membership is managed in Samsung Contacts; the SMS app only mirrors it.
     }
     
     fun isContactInGroup(groupId: String, contactAddress: String): Boolean {
-        return _groups.find { it.id == groupId }?.contacts?.contains(contactAddress) ?: false
+        return _groups.find { group ->
+            group.id == groupId && group.contacts.any { number ->
+                SmsUtils.phoneNumbersMatch(getApplication(), number, contactAddress)
+            }
+        } != null
     }
     
     fun selectConversation(contactAddress: String) {
         currentContact.value = contactAddress
+        conversationSearchQuery.value = ""
         isInConversationList.value = false
         
         // Filter messages for this conversation
@@ -294,6 +308,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         isInConversationList.value = true
         currentContact.value = ""
         currentContactName.value = ""
+        conversationSearchQuery.value = ""
     }
     
     fun composeNewMessage() {

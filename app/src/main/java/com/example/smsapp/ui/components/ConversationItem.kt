@@ -37,14 +37,14 @@ import java.util.Locale
 fun ConversationItem(
     conversation: Conversation,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onLongClick ?: {}
             )
     ) {
         Column {
