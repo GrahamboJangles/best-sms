@@ -26,9 +26,12 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         const val ARCHIVED = "archived"
         const val MUTED = "muted"
         const val BLOCKED = "blocked"
+        const val DRAFT_RECIPIENT = "draft_recipient"
+        const val DRAFT_MESSAGE = "draft_message"
     }
 
     private val conversationPrefs = application.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
+    private val draftPrefs = application.getSharedPreferences("message_draft", Application.MODE_PRIVATE)
     
     // Messages for all conversations
     private val _allMessages = mutableStateListOf<SmsMessage>()
@@ -367,12 +370,33 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         conversationSearchQuery.value = ""
     }
     
+    fun updateRecipient(value: String) {
+        currentRecipient.value = value
+        saveDraft()
+    }
+
+    fun updateMessage(value: String) {
+        currentMessage.value = value
+        saveDraft()
+    }
+
+    private fun saveDraft() {
+        draftPrefs.edit()
+            .putString(DRAFT_RECIPIENT, currentRecipient.value)
+            .putString(DRAFT_MESSAGE, currentMessage.value)
+            .apply()
+    }
+
+    private fun clearDraft() {
+        draftPrefs.edit().remove(DRAFT_RECIPIENT).remove(DRAFT_MESSAGE).apply()
+    }
+
     fun composeNewMessage() {
         isInConversationList.value = false
         currentContact.value = ""
         currentContactName.value = ""
-        currentRecipient.value = ""
-        currentMessage.value = ""
+        currentRecipient.value = draftPrefs.getString(DRAFT_RECIPIENT, "").orEmpty()
+        currentMessage.value = draftPrefs.getString(DRAFT_MESSAGE, "").orEmpty()
         _messages.clear()
     }
     
@@ -451,6 +475,7 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             
             // Clear the message input and attachment
             currentMessage.value = ""
+            clearDraft()
             clearAttachment()
         }
     }

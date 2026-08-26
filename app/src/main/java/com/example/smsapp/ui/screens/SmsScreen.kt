@@ -269,7 +269,7 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                     if (currentContact.isEmpty()) {
                         OutlinedTextField(
                             value = currentRecipient,
-                            onValueChange = { viewModel.currentRecipient.value = it },
+                            onValueChange = viewModel::updateRecipient,
                             label = { Text("Recipient") },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -281,7 +281,7 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                     // Message input field
                     OutlinedTextField(
                         value = currentMessage,
-                        onValueChange = { viewModel.currentMessage.value = it },
+                        onValueChange = viewModel::updateMessage,
                         label = { Text("Message") },
                         modifier = Modifier
                             .weight(1f)
