@@ -1,6 +1,9 @@
 package com.example.smsapp.viewmodel
 
+import android.app.AlarmManager
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
@@ -12,6 +15,7 @@ import com.example.smsapp.model.ContactGroup
 import com.example.smsapp.model.Conversation
 import com.example.smsapp.model.SmsMessage
 import com.example.smsapp.model.SendStatus
+import com.example.smsapp.receiver.ScheduledSmsReceiver
 import com.example.smsapp.util.SmsUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -263,6 +267,18 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
         _conversations.sortWith(compareByDescending<Conversation> { it.isPinned }.thenByDescending { it.lastMessageTimestamp })
     }
 
+    fun exportBackupText(): String {
+        return buildString {
+            appendLine("BestSMS backup")
+            appendLine("Exported: ${java.util.Date()}")
+            appendLine()
+            _allMessages.sortedBy { it.date }.forEach { message ->
+                appendLine("${java.util.Date(message.date)} | ${message.address} | ${message.body}")
+                if (message.hasAttachment) appendLine("Attachment: ${message.attachmentType} ${message.attachmentContentType}")
+            }
+        }
+    }
+
     fun toggleArchivedView() {
         showArchived.value = !showArchived.value
         filterConversationsByGroup()
@@ -409,6 +425,30 @@ class SmsViewModel(application: Application) : AndroidViewModel(application) {
             currentAttachmentContentType.value = message.attachmentContentType
         }
         sendMessage()
+    }
+
+    fun scheduleMessageAfterMinutes(minutes: Int): Boolean {
+        val recipient = currentRecipient.value.ifBlank { currentContact.value }
+        val body = currentMessage.value
+        if (recipient.isBlank() || body.isBlank() || minutes <= 0) return false
+        val requestCode = (System.currentTimeMillis() and 0x7fffffff).toInt()
+        val intent = Intent(getApplication(), ScheduledSmsReceiver::class.java).apply {
+            putExtra(ScheduledSmsReceiver.EXTRA_RECIPIENT, recipient)
+            putExtra(ScheduledSmsReceiver.EXTRA_BODY, body)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            getApplication(), requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarm = getApplication<Application>().getSystemService(AlarmManager::class.java)
+        alarm.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis() + minutes * 60_000L,
+            pendingIntent
+        )
+        currentMessage.value = ""
+        clearDraft()
+        return true
     }
 
     fun sendMessage() {

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -27,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.example.smsapp.model.Conversation
 import com.example.smsapp.ui.components.ConversationItem
 import com.example.smsapp.ui.components.GroupTab
@@ -54,6 +58,14 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
     val globalSearchQuery by remember { viewModel.globalSearchQuery }
     val showArchived by remember { viewModel.showArchived }
     val diagnosticInfo by remember { viewModel.diagnosticInfo }
+    val context = LocalContext.current
+    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) {
+            context.contentResolver.openOutputStream(uri)?.use { output ->
+                output.write(viewModel.exportBackupText().toByteArray())
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -80,6 +92,11 @@ fun ConversationListScreen(viewModel: SmsViewModel) {
                             imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = if (showSearch) "Close search" else "Search messages"
                         )
+                    }
+                    IconButton(onClick = {
+                        backupLauncher.launch("bestsms-backup-${System.currentTimeMillis()}.txt")
+                    }) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Export backup")
                     }
                     IconButton(onClick = { viewModel.toggleArchivedView() }) {
                         Icon(

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -95,6 +96,7 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
     val selectedAttachment by remember { viewModel.selectedAttachment }
     var showConversationSearch by remember { mutableStateOf(false) }
     var selectedMessageForMenu by remember { mutableStateOf<SmsMessage?>(null) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -303,6 +305,13 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                         Icon(Icons.Default.AttachFile, contentDescription = "Attach file")
                     }
                     
+                    IconButton(
+                        onClick = { showScheduleDialog = true },
+                        enabled = currentMessage.isNotBlank() && (currentRecipient.isNotBlank() || currentContact.isNotBlank())
+                    ) {
+                        Icon(Icons.Default.Schedule, contentDescription = "Schedule message")
+                    }
+
                     // Send button
                     IconButton(
                         onClick = {
@@ -373,6 +382,33 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    if (showScheduleDialog) {
+        AlertDialog(
+            onDismissRequest = { showScheduleDialog = false },
+            title = { Text("Schedule message") },
+            text = {
+                Column {
+                    Text("Choose when to send this message.")
+                    TextButton(onClick = {
+                        viewModel.scheduleMessageAfterMinutes(15)
+                        showScheduleDialog = false
+                    }) { Text("In 15 minutes") }
+                    TextButton(onClick = {
+                        viewModel.scheduleMessageAfterMinutes(60)
+                        showScheduleDialog = false
+                    }) { Text("In 1 hour") }
+                    TextButton(onClick = {
+                        viewModel.scheduleMessageAfterMinutes(24 * 60)
+                        showScheduleDialog = false
+                    }) { Text("Tomorrow") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showScheduleDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     selectedMessageForMenu?.let { message ->
