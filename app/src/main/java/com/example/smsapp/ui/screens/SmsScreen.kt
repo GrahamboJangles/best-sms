@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -54,6 +55,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -85,10 +88,12 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
     val currentMessage by remember { viewModel.currentMessage }
     val permissionsGranted by remember { viewModel.permissionsGranted }
     val currentContact by remember { viewModel.currentContact }
+    val conversationSearchQuery by remember { viewModel.conversationSearchQuery }
     val currentAttachmentUri by remember { viewModel.currentAttachmentUri }
     val showAttachmentOptions by remember { viewModel.showAttachmentOptions }
     val showAttachmentDialog by remember { viewModel.showAttachmentDialog }
     val selectedAttachment by remember { viewModel.selectedAttachment }
+    var showConversationSearch by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -170,7 +175,15 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
         topBar = {
             TopAppBar(
                 title = {
-                    if (!viewModel.isInConversationList.value) {
+                    if (showConversationSearch && currentContact.isNotEmpty()) {
+                        OutlinedTextField(
+                            value = conversationSearchQuery,
+                            onValueChange = viewModel::setConversationSearchQuery,
+                            placeholder = { Text("Search conversation") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else if (!viewModel.isInConversationList.value) {
                         if (viewModel.currentContact.value.isNotEmpty()) {
                             val contactName = viewModel.currentContactName.value
                             val contactNumber = viewModel.currentContact.value
@@ -193,6 +206,19 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                             viewModel.goToConversationList()
                         }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
+                actions = {
+                    if (currentContact.isNotEmpty()) {
+                        IconButton(onClick = {
+                            showConversationSearch = !showConversationSearch
+                            if (!showConversationSearch) viewModel.clearConversationSearch()
+                        }) {
+                            Icon(
+                                imageVector = if (showConversationSearch) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = if (showConversationSearch) "Close conversation search" else "Search conversation"
+                            )
                         }
                     }
                 }
@@ -321,17 +347,25 @@ fun SmsScreen(viewModel: SmsViewModel, modifier: Modifier = Modifier) {
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    reverseLayout = false
-                ) {
+                if (conversationSearchQuery.isNotBlank() && messages.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No messages match your search")
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        reverseLayout = false
+                    ) {
                     items(messages) { message ->
                         MessageItem(
                             message = message,
                             onAttachmentClick = { viewModel.viewAttachment(message) }
                         )
+                        }
                     }
                 }
             }
